@@ -121,7 +121,6 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 				}
 			}
 		}
-
 		addMetrics(&metrics, values, labels, rowTimeStamp, baseMetricName)
 	}
 
@@ -166,7 +165,10 @@ func addMetrics(metriclist *map[string][]string, values map[string]float64, labe
 		}
 		var metricString string
 		if labelsList == "" {
-			defaultLabel := viper.GetString("default.label") + "=\"" + k + "\""
+			defaultLabel := ""   // normally no labels are added
+			if len(values) > 1 { // except when there are multiple values in a record, where we add the key name with default label
+				defaultLabel = viper.GetString("default.label") + "=\"" + k + "\""
+			}
 			metricString = fmt.Sprintf("%s{%s} %f %d", mn, defaultLabel, v, t.Unix())
 		} else {
 			metricString = fmt.Sprintf("%s_%s{%s} %f %d", mn, k, labelsList, v, t.Unix())
