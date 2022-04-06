@@ -149,6 +149,8 @@ func to_snake_case(basename string) string {
 
 func addMetrics(metriclist *map[string][]string, values map[string]float64, labels map[string]string, t time.Time, mn string) {
 	labelsList := ""
+	defaultMetricNames := viper.GetStringMapString("default_labelname")
+	defaultLabelName := defaultMetricNames[mn]
 	for k, v := range labels {
 		if labelsList != "" {
 			labelsList = labelsList + fmt.Sprintf(", %s=\"%s\"", to_snake_case(k), v)
@@ -167,7 +169,8 @@ func addMetrics(metriclist *map[string][]string, values map[string]float64, labe
 		if labelsList == "" {
 			defaultLabel := ""   // normally no labels are added
 			if len(values) > 1 { // except when there are multiple values in a record, where we add the key name with default label
-				defaultLabel = viper.GetString("default.label") + "=\"" + k + "\""
+				//				defaultLabel = viper.GetString("default.label") + "=\"" + k + "\""
+				defaultLabel = defaultLabelName + "=\"" + k + "\""
 			}
 			metricString = fmt.Sprintf("%s{%s} %f %d", mn, defaultLabel, v, t.Unix())
 		} else {

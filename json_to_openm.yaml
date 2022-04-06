@@ -1,0 +1,8 @@
+time:
+  field: time
+  format: 2006-01-02
+debug: true
+
+default_labelname:
+  daily_batchjob : frequency
+  total_daily_delta_table_updates: table
