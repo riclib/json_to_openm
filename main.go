@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-logr/logr"
 	"github.com/gobeam/stringy"
+	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"io/ioutil"
@@ -38,7 +38,7 @@ func main() {
 
 	outputFile, err := os.Create(viper.GetString("out"))
 	if err != nil {
-		log.Error(err, "failed to create output")
+		log.Fatal().Err(err).Msg("failed to create output")
 	}
 	defer outputFile.Close()
 
@@ -47,19 +47,24 @@ func main() {
 	}
 	_, err = fmt.Fprintln(outputFile, "# EOF")
 	if err != nil {
-		log.Error(err, "couldn't write to file")
+		log.Fatal().Err(err).Msg("couldn't write to file")
 	}
 }
 
-func processFile(log logr.Logger, inputFileName string, outputFile *os.File) {
+func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) {
 	jsonFile, err := os.Open(inputFileName)
 	if err != nil {
-		log.Error(err, "failed to open input")
+		log.Fatal().Err(err).Msg("failed to open input")
 	}
 	defer jsonFile.Close()
 	basename := filepath.Base(inputFileName)
-	basename = basename[:strings.IndexByte(basename, '_')]
-	baseMetricName := stringy.New(basename).SnakeCase("?", "").ToLower()
+	i := strings.IndexByte(basename, '_')
+	if i == -1 {
+		log.Fatal().Err(err).Str("file", basename).Msg("filename does not have an _")
+		return
+	}
+	basename = basename[:i]
+	baseMetricName := to_snake_case(basename)
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 	//	log.V(1).Info("Starting to process", "in", inputFileName, "out", outputFileName, "metric", baseMetricName)
@@ -67,7 +72,7 @@ func processFile(log logr.Logger, inputFileName string, outputFile *os.File) {
 	var jsonMap []map[string]interface{}
 	json.Unmarshal(byteValue, &jsonMap)
 
-	log.V(2).Info("Read json lines", "count", len(jsonMap))
+	log.Trace().Int("count", len(jsonMap)).Msg("Read Json lines")
 
 	//	prevTimeStamp, _ := time.Parse("2006-01-02", "2999-01-01")
 	metrics := make(map[string][]string)
@@ -80,11 +85,11 @@ func processFile(log logr.Logger, inputFileName string, outputFile *os.File) {
 		if found {
 			rowTimeStamp, err = time.Parse(timeformat, rowTime)
 			if err != nil {
-				log.Error(err, "couldn't parse time")
+				log.Error().Err(err).Msg("couldn't parse time")
 			}
 		} else {
 			rowTimeStamp = runTimeStamp
-			log.V(2).Info("defaulted time", "runtime", runTimeStamp)
+			log.Trace().Time("runtime", runTimeStamp).Msg("defaulted time")
 		}
 
 		values := make(map[string]float64)
@@ -100,12 +105,12 @@ func processFile(log logr.Logger, inputFileName string, outputFile *os.File) {
 				if len(fields) == 2 {
 					values["count"], err = strconv.ParseFloat(fields[0], 64)
 					if err != nil {
-						log.Error(err, "Failed to convert count_percent to float")
+						log.Error().Err(err).Msg("Failed to convert count_percent to float")
 					}
 					pc := strings.Trim(fields[1], "(%)")
 					values["pc"], err = strconv.ParseFloat(pc, 64)
 				} else {
-					log.Error(errors.New("not enough fields"), "couldn't parse count_percent field")
+					log.Error().Err(errors.New("not enough fields")).Msg("couldn't parse count_percent field")
 				}
 			default:
 				switch v.(type) {
@@ -124,23 +129,32 @@ func processFile(log logr.Logger, inputFileName string, outputFile *os.File) {
 		for _, v := range m {
 			_, err = fmt.Fprintln(outputFile, v)
 			if err != nil {
-				log.Error(err, "couldn't write to file")
+				log.Error().Err(err).Msg("couldn't write to file")
 			}
 		}
 		if len(m) > 0 {
-			log.Info("Wrote Open Metrics", "count", len(m), "sample", m[0], "input", inputFileName)
+			log.Trace().
+				Int("count", len(m)).
+				Str("sample", m[0]).
+				Str("input", inputFileName).
+				Msg("Wrote Open Metrics")
 		}
 	}
 
+}
+
+func to_snake_case(basename string) string {
+	baseMetricName := stringy.New(basename).SnakeCase("?", "").ToLower()
+	return baseMetricName
 }
 
 func addMetrics(metriclist *map[string][]string, values map[string]float64, labels map[string]string, t time.Time, mn string) {
 	labelsList := ""
 	for k, v := range labels {
 		if labelsList != "" {
-			labelsList = labelsList + fmt.Sprintf(", %s=\"%s\"", k, v)
+			labelsList = labelsList + fmt.Sprintf(", %s=\"%s\"", to_snake_case(k), v)
 		} else {
-			labelsList = fmt.Sprintf("%s=\"%s\"", k, v)
+			labelsList = fmt.Sprintf("%s=\"%s\"", to_snake_case(k), v)
 
 		}
 	}
