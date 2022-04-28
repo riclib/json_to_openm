@@ -14,7 +14,7 @@ else
   TMP="/tmp"
 fi
 
-
+echo $BIN
 
 #!/bin/bash
 mv $DATA/inbox/* $DATA/processing || die " No Files to process"
@@ -23,13 +23,22 @@ mv $DATA/inbox/* $DATA/processing || die " No Files to process"
 try $BIN/json_to_openm --out /tmp/out.prom $DATA/processing/*.json
 
 # stop prometheus
-try pkill -f conf/is/prom
+echo test is $TEST
+if [ -z "$TEST" ]; then
+   try pkill -f conf/is/prom
+else
+   yell "Not killing prometheus as just testing"
+fi
 
 # generate blocks
-try $BIN/promtool tsdb create-blocks-from openmetrics --max-block-duration=168h $BIN/import/out.prom $OUTPUT
+try $BIN/promtool tsdb create-blocks-from openmetrics --max-block-duration=168h $TMP/out.prom $OUTPUT
 
 # start prometheus
-try $BIN/prom_is_start.sh
+if [ -z "$TEST" ]; then
+  try $BIN/prom_is_start.sh
+else 
+  yell "Not starting prometheus as just testing"
+fi
 
 # archive the processed files
 try mv $DATA/processing/* $DATA/archive
