@@ -9,7 +9,7 @@ if [ -z "$TEST" ]; then
   TMP="/tmp"
 else 
   DATA="test"
-  OUTPUT="data"
+  OUTPUT="test/blocks"
   BIN="."
   TMP="/tmp"
 fi
