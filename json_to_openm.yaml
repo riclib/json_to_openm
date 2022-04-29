@@ -1,8 +1,18 @@
 time:
   field: time
-  format: 2006-01-02
+  formats:
+    - 2006-01-02
+    - 2006-01-02 15:04:05
 debug: true
 
+common_label_names:
+  - run_name
+  - upload_weekday
 default_labelname:
   daily_batchjob : frequency
   total_daily_delta_table_updates: table
+  actual_predicted_sla: kind
+  actual_suggested_number_of_worker: kind
+  all_stream_batch_job: group
+  least_updated_tables: table
+  weekday_total_batchjobs: kind

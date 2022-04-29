@@ -78,15 +78,24 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 	metrics := make(map[string][]string)
 
 	timefield := viper.GetString("time.field")
-	timeformat := viper.GetString("time.format")
+	//	timeformat := viper.GetString("time.format")
+	timeformats := viper.GetStringSlice("time.formats")
 	for _, row := range jsonMap {
 		rowTime, found := row[timefield].(string)
 		var rowTimeStamp time.Time
 		if found {
-			rowTimeStamp, err = time.Parse(timeformat, rowTime)
-			if err != nil {
+			succesfullyParsed := false
+			for _, timeformat := range timeformats {
+				rowTimeStamp, err = time.Parse(timeformat, rowTime)
+				if err == nil {
+					succesfullyParsed = true
+					break
+				}
+			}
+			if !succesfullyParsed {
 				log.Error().Err(err).Msg("couldn't parse time")
 			}
+
 		} else {
 			rowTimeStamp = runTimeStamp
 			log.Trace().Time("runtime", runTimeStamp).Msg("defaulted time")
@@ -150,15 +159,21 @@ func to_snake_case(basename string) string {
 func addMetrics(metriclist *map[string][]string, values map[string]float64, labels map[string]string, t time.Time, mn string) {
 	labelsList := ""
 	defaultMetricNames := viper.GetStringMapString("default_labelname")
+	commonLabelNames := viper.GetStringSlice("common_label_names")
 	defaultLabelName := defaultMetricNames[mn]
+	numberOfCommonLabels := 0
 	for k, v := range labels {
 		if labelsList != "" {
-			labelsList = labelsList + fmt.Sprintf(", %s=\"%s\"", to_snake_case(k), v)
+			labelsList = labelsList + fmt.Sprintf(",%s=\"%s\"", to_snake_case(k), v)
 		} else {
 			labelsList = fmt.Sprintf("%s=\"%s\"", to_snake_case(k), v)
-
+		}
+		if contains(commonLabelNames, k) {
+			numberOfCommonLabels++
 		}
 	}
+	onlyCommonLabels := numberOfCommonLabels == len(labels)
+
 	for k, v := range values {
 
 		_, found := (*metriclist)[k]
@@ -174,11 +189,30 @@ func addMetrics(metriclist *map[string][]string, values map[string]float64, labe
 			}
 			metricString = fmt.Sprintf("%s{%s} %f %d", mn, defaultLabel, v, t.Unix())
 		} else {
-			metricString = fmt.Sprintf("%s_%s{%s} %f %d", mn, k, labelsList, v, t.Unix())
+			if len(values) == 1 {
+				metricString = fmt.Sprintf("%s_%s{%s} %f %d", mn, k, labelsList, v, t.Unix())
+			} else {
+				if onlyCommonLabels {
+					defaultLabel := defaultLabelName + "=\"" + k + "\""
+					metricString = fmt.Sprintf("%s{%s,%s} %f %d", mn, defaultLabel, labelsList, v, t.Unix())
+				} else {
+					metricString = fmt.Sprintf("%s_%s{%s} %f %d", mn, k, labelsList, v, t.Unix())
+				}
+			}
 		}
 		(*metriclist)[k] = append((*metriclist)[k], metricString)
 		if viper.GetBool("debug") {
 			fmt.Println(metricString)
 		}
 	}
+}
+
+func contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
 }
