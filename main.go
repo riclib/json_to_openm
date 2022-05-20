@@ -57,12 +57,29 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 		log.Fatal().Err(err).Msg("failed to open input")
 	}
 	defer jsonFile.Close()
+
 	basename := filepath.Base(inputFileName)
+
 	i := strings.IndexByte(basename, '_')
+	j := strings.Index(basename, "-stream")
+
 	if i == -1 {
 		log.Fatal().Err(err).Str("file", basename).Msg("filename does not have an _")
 		return
 	}
+	if j == -1 {
+		log.Fatal().Err(err).Str("file", basename).Msg("filename does not have a timestamp")
+		return
+	}
+
+	defaultTimeStampStr := basename[i+1 : j]
+	log.Debug().Str("default_ts", defaultTimeStampStr).Msg("Default Timestamp")
+	defaultTimeStamp, err := time.Parse("20060102T150405Z", defaultTimeStampStr)
+	if err != nil {
+		log.Debug().Err(err).Msg("failed to parse default time stamp, defaulting to run time")
+		defaultTimeStamp = runTimeStamp
+	}
+
 	basename = basename[:i]
 	baseMetricName := to_snake_case(basename)
 
@@ -97,7 +114,7 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 			}
 
 		} else {
-			rowTimeStamp = runTimeStamp
+			rowTimeStamp = defaultTimeStamp
 			log.Trace().Time("runtime", runTimeStamp).Msg("defaulted time")
 		}
 
