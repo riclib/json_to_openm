@@ -93,7 +93,7 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 				}
 			}
 			if !succesfullyParsed {
-				log.Error().Err(err).Msg("couldn't parse time")
+				log.Error().Err(err).Str("timefield", rowTime).Str("file", basename).Msg("couldn't parse time")
 			}
 
 		} else {
