@@ -61,7 +61,7 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 	basename := filepath.Base(inputFileName)
 
 	i := strings.IndexByte(basename, '_')
-	j := strings.Index(basename, "-stream")
+	j := strings.Index(basename, "Z-")
 
 	if i == -1 {
 		log.Fatal().Err(err).Str("file", basename).Msg("filename does not have an _")
@@ -72,7 +72,7 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 		return
 	}
 
-	defaultTimeStampStr := basename[i+1 : j]
+	defaultTimeStampStr := basename[i+1 : j-1]
 	log.Debug().Str("default_ts", defaultTimeStampStr).Msg("Default Timestamp")
 	defaultTimeStamp, err := time.Parse("20060102T150405Z", defaultTimeStampStr)
 	if err != nil {
