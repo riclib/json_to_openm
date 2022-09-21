@@ -72,7 +72,7 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 		return
 	}
 
-	defaultTimeStampStr := basename[i+1 : j-1]
+	defaultTimeStampStr := basename[i+1 : j+1]
 	log.Debug().Str("default_ts", defaultTimeStampStr).Msg("Default Timestamp")
 	defaultTimeStamp, err := time.Parse("20060102T150405Z", defaultTimeStampStr)
 	if err != nil {
