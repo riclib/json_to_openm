@@ -21,15 +21,22 @@ var (
 )
 
 func main() {
+	var positions Positions
 
 	pflag.String("time.format", "2006-01-02", "time field layout in golang time.Parse format")
 	pflag.String("time.field", "time", "field to get the time for")
 	pflag.String("out", "", "File to write to")
+	pflag.String("positions.file", "positions.yml", "file to keep track of positions")
 	pflag.Bool("debug", false, "more logging")
 	pflag.String("default.label", "table", "label to set from key if there are no labels in record")
 	getConfig()
 
 	log := SetupLog()
+	var err error
+	positions, err = LoadPositions()
+	if err != nil {
+		log.Fatal().Err(err).Msg("couldn't load positions")
+	}
 
 	if viper.GetString("out") == "" {
 		fmt.Println("No output file provided")
@@ -43,15 +50,21 @@ func main() {
 	defer outputFile.Close()
 
 	for _, f := range pflag.Args() {
-		processFile(log, f, outputFile)
+		processFile(log, f, outputFile, &positions)
 	}
 	_, err = fmt.Fprintln(outputFile, "# EOF")
 	if err != nil {
 		log.Fatal().Err(err).Msg("couldn't write to file")
 	}
+
+	err = SavePositions(positions)
+	if err != nil {
+		log.Fatal().Err(err).Msg("couldn't save positions")
+	}
+
 }
 
-func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) {
+func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File, positions *Positions) {
 	jsonFile, err := os.Open(inputFileName)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to open input")
@@ -82,6 +95,13 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 
 	basename = basename[:i]
 	baseMetricName := to_snake_case(basename)
+
+	filterTS, found := positions.Positions[baseMetricName]
+	if !found {
+		filterTS = time.Time{}
+	}
+	maxTs := time.Time{}
+	filteredMetrics := 0
 
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 	//	log.V(1).Info("Starting to process", "in", inputFileName, "out", outputFileName, "metric", baseMetricName)
@@ -118,6 +138,15 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 			log.Trace().Time("runtime", runTimeStamp).Msg("defaulted time")
 		}
 
+		// Filter metrics
+		if filterTS.After(rowTimeStamp) || filterTS.Equal(rowTimeStamp) {
+			filteredMetrics++
+			continue
+		}
+		if maxTs.Before(rowTimeStamp) {
+			maxTs = rowTimeStamp
+		}
+
 		values := make(map[string]float64)
 		labels := make(map[string]string)
 
@@ -147,8 +176,10 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 				}
 			}
 		}
+
 		addMetrics(&metrics, values, labels, rowTimeStamp, baseMetricName)
 	}
+	log.Info().Int("num", filteredMetrics).Msg("Filtered metrics")
 
 	for _, m := range metrics {
 		for _, v := range m {
@@ -165,7 +196,7 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File) 
 				Msg("Wrote Open Metrics")
 		}
 	}
-
+	positions.Positions[baseMetricName] = maxTs
 }
 
 func to_snake_case(basename string) string {
