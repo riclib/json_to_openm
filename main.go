@@ -50,7 +50,7 @@ func main() {
 	defer outputFile.Close()
 
 	for _, f := range pflag.Args() {
-		processFile(log, f, outputFile, &positions)
+		processFile(log, f, outputFile, originalPositions, &updatedPositions)
 	}
 	_, err = fmt.Fprintln(outputFile, "# EOF")
 	if err != nil {
