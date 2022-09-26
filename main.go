@@ -21,7 +21,7 @@ var (
 )
 
 func main() {
-	var positions Positions
+	var originalPositions, updatedPositions Positions
 
 	pflag.String("time.format", "2006-01-02", "time field layout in golang time.Parse format")
 	pflag.String("time.field", "time", "field to get the time for")
@@ -33,11 +33,11 @@ func main() {
 
 	log := SetupLog()
 	var err error
-	positions, err = LoadPositions()
+	originalPositions, err = LoadPositions()
 	if err != nil {
 		log.Fatal().Err(err).Msg("couldn't load positions")
 	}
-
+	updatedPositions = originalPositions
 	if viper.GetString("out") == "" {
 		fmt.Println("No output file provided")
 		os.Exit(1)
@@ -57,14 +57,14 @@ func main() {
 		log.Fatal().Err(err).Msg("couldn't write to file")
 	}
 
-	err = SavePositions(positions)
+	err = SavePositions(updatedPositions)
 	if err != nil {
 		log.Fatal().Err(err).Msg("couldn't save positions")
 	}
 
 }
 
-func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File, positions *Positions) {
+func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File, originalPositions Positions, updatedPositions *Positions) {
 	jsonFile, err := os.Open(inputFileName)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to open input")
@@ -96,7 +96,7 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File, 
 	basename = basename[:i]
 	baseMetricName := to_snake_case(basename)
 
-	filterTS, found := positions.Positions[baseMetricName]
+	filterTS, found := originalPositions.Positions[baseMetricName]
 	if !found {
 		filterTS = time.Time{}
 	}
@@ -196,7 +196,10 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File, 
 				Msg("Wrote Open Metrics")
 		}
 	}
-	positions.Positions[baseMetricName] = maxTs
+	updatedPos, _ := updatedPositions.Positions[baseMetricName]
+	if maxTs.After(updatedPos) {
+		updatedPositions.Positions[baseMetricName] = maxTs
+	}
 }
 
 func to_snake_case(basename string) string {
