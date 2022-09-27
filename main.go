@@ -37,7 +37,11 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("couldn't load positions")
 	}
-	updatedPositions = originalPositions
+	updatedPositions, err = LoadPositions()
+	if err != nil {
+		log.Fatal().Err(err).Msg("couldn't load positions")
+	}
+
 	if viper.GetString("out") == "" {
 		fmt.Println("No output file provided")
 		os.Exit(1)
