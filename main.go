@@ -183,8 +183,9 @@ func processFile(log zerolog.Logger, inputFileName string, outputFile *os.File, 
 
 		addMetrics(&metrics, values, labels, rowTimeStamp, baseMetricName)
 	}
-	log.Info().Int("num", filteredMetrics).Str("basename", baseMetricName).Msg("Filtered metrics")
-
+	if filteredMetrics > 0 {
+		log.Info().Int("num", filteredMetrics).Str("basename", baseMetricName).Msg("Filtered metrics")
+	}
 	for _, m := range metrics {
 		for _, v := range m {
 			_, err = fmt.Fprintln(outputFile, v)
